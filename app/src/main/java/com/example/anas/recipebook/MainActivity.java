@@ -1,11 +1,9 @@
 package com.example.anas.recipebook;
+import com.example.anas.recipebook.content_provider.MyContentProvider;
 
-import android.content.ContentValues;
-import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
-import android.net.Uri;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -14,32 +12,34 @@ import android.text.InputType;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.ListAdapter;
 import android.widget.ListView;
-
-import com.example.anas.recipebook.content_provider.MyContentProvider;
-
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
     ListView recipesListView;
     List<Recipe> data;
     ContentAdapter adapter;
+    Button addNewBtn;
+    private static boolean isFinding = false;
+    DatabaseHandler dbHandler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         Log.d("MYAPP", "MainActivity: onCreate()");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        dbHandler = new DatabaseHandler(this, null, null,
+                AppContract.DATABASE_VERSION);
 
+        isFinding = false;
+        addNewBtn = findViewById(R.id.addRecBtn);
+        addNewBtn.setText("Add new");
         recipesListView = findViewById(R.id.recipesListView);
+
         recipesListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
@@ -51,7 +51,6 @@ public class MainActivity extends AppCompatActivity {
                 startActivityForResult(intent, 1);
             }
         });
-
         displayDBContents();
     }
 
@@ -67,9 +66,9 @@ public class MainActivity extends AppCompatActivity {
     private void displayDBContents() {
         // define set of columns to query
         String[] mProjection = new String[] {
-            DatabaseHandler.COLUMN_ID,
-            DatabaseHandler.COLUMN_RECIPETITLE,
-            DatabaseHandler.COLUMN_RECIPECONTENT
+            AppContract.COLUMN_ID,
+            AppContract.COLUMN_RECIPETITLE,
+            AppContract.COLUMN_RECIPECONTENT
         };
 
         Cursor cursor = getContentResolver().query(MyContentProvider.CONTENT_URI, mProjection,
@@ -79,9 +78,9 @@ public class MainActivity extends AppCompatActivity {
 
         while (cursor.moveToNext()) {
             Recipe recipe = new Recipe(
-                    Integer.parseInt(cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_ID))),
-                    cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_RECIPETITLE)),
-                    cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_RECIPECONTENT)));
+                    Integer.parseInt(cursor.getString(cursor.getColumnIndex(AppContract.COLUMN_ID))),
+                    cursor.getString(cursor.getColumnIndex(AppContract.COLUMN_RECIPETITLE)),
+                    cursor.getString(cursor.getColumnIndex(AppContract.COLUMN_RECIPECONTENT)));
             data.add(recipe);
         }
 
@@ -90,8 +89,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void addRecipeOnClick(View view) {
-        Intent intent = new Intent(this, NewRecipeActivity.class);
-        startActivityForResult(intent, 0);
+        if (isFinding) {
+            isFinding = false;
+            addNewBtn.setText("Add new");
+            displayDBContents();
+        } else {
+            Intent intent = new Intent(this, NewRecipeActivity.class);
+            startActivityForResult(intent, 0);
+        }
     }
 
     public void findRecipeOnClick(View view) {
@@ -104,23 +109,11 @@ public class MainActivity extends AppCompatActivity {
         dialog.setPositiveButton("Search", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialogInterface, int i) {
-                Cursor cursor = getContentResolver().query(MyContentProvider.CONTENT_URI,
-                        null, null, null, null);
+                isFinding = true;
+                addNewBtn.setText("Cancel");
 
-                data = new ArrayList<Recipe>();
-                List<Recipe> foundMatches = new ArrayList<Recipe>();
-
-                while (cursor.moveToNext()) {
-                    Recipe recipe = new Recipe(
-                            Integer.parseInt(cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_ID))),
-                            cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_RECIPETITLE)),
-                            cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_RECIPECONTENT)));
-                    data.add(recipe);
-
-                    if (recipe.getRecipeTitle().contains(input.getText())) {
-                        foundMatches.add(recipe);
-                    }
-                }
+                List<Recipe> foundMatches = dbHandler.findRecipe(input.getText().toString());
+                adapter.clear();
                 adapter.addAll(foundMatches);
                 adapter.notifyDataSetChanged();
             }
