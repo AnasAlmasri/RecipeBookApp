@@ -30,6 +30,8 @@ import java.util.Map;
 public class MainActivity extends AppCompatActivity {
 
     ListView recipesListView;
+    List<Recipe> data;
+    ContentAdapter adapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,19 +43,23 @@ public class MainActivity extends AppCompatActivity {
         recipesListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                Map<String, String> map = (Map<String, String>) adapterView.getSelectedItem();
+                Recipe recipe = data.get(i);
                 Intent intent = new Intent(getApplicationContext(), ViewRecipeActivity.class);
-                intent.putExtra("id", new ArrayList<String>(map.values()).get(0));
+                intent.putExtra("id", Integer.toString(recipe.getID()));
+                intent.putExtra("title", recipe.getRecipeTitle());
+                intent.putExtra("content", recipe.getRecipeContent());
                 startActivityForResult(intent, 1);
             }
         });
+
         displayDBContents();
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        if (requestCode == 0) {
-            Log.d("MYAPP", Integer.toString(resultCode));
+        if (requestCode == 0 && resultCode == RESULT_OK) {
+            displayDBContents();
+        } else if (requestCode == 1 && resultCode == RESULT_OK) {
             displayDBContents();
         }
     }
@@ -69,17 +75,17 @@ public class MainActivity extends AppCompatActivity {
         Cursor cursor = getContentResolver().query(MyContentProvider.CONTENT_URI, mProjection,
                 null, null, null);
 
-        List<Map<String, String>> data = new ArrayList<Map<String, String>>();
-        Map<String, String> map;
+        data = new ArrayList<Recipe>();
 
         while (cursor.moveToNext()) {
-            map = new HashMap<>();
-            map.put("id", cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_ID)));
-            map.put("title", cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_RECIPETITLE)));
-            data.add(map);
+            Recipe recipe = new Recipe(
+                    Integer.parseInt(cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_ID))),
+                    cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_RECIPETITLE)),
+                    cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_RECIPECONTENT)));
+            data.add(recipe);
         }
 
-        ContentAdapter adapter = new ContentAdapter(this, data);
+        adapter = new ContentAdapter(this, data);
         recipesListView.setAdapter(adapter);
     }
 
@@ -90,7 +96,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void findRecipeOnClick(View view) {
         AlertDialog.Builder dialog = new AlertDialog.Builder(this);
-        dialog.setTitle("Search by ID");
+        dialog.setTitle("Search by title");
         final EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_TEXT);
         dialog.setView(input);
@@ -98,19 +104,25 @@ public class MainActivity extends AppCompatActivity {
         dialog.setPositiveButton("Search", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialogInterface, int i) {
-                String[] mProjection = new String[] {
-                        DatabaseHandler.COLUMN_ID,
-                        DatabaseHandler.COLUMN_RECIPETITLE,
-                };
-                Cursor cursor = getContentResolver().query(MyContentProvider.CONTENT_URI, mProjection,
-                        "id = ? ", new String[]{input.getText().toString()}, null);
+                Cursor cursor = getContentResolver().query(MyContentProvider.CONTENT_URI,
+                        null, null, null, null);
 
-                Map<String, String> map;
-                if (cursor.moveToNext()) {
-                    map = new HashMap<>();
-                    map.put("id", cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_ID)));
-                    map.put("title", cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_RECIPETITLE)));
+                data = new ArrayList<Recipe>();
+                List<Recipe> foundMatches = new ArrayList<Recipe>();
+
+                while (cursor.moveToNext()) {
+                    Recipe recipe = new Recipe(
+                            Integer.parseInt(cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_ID))),
+                            cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_RECIPETITLE)),
+                            cursor.getString(cursor.getColumnIndex(DatabaseHandler.COLUMN_RECIPECONTENT)));
+                    data.add(recipe);
+
+                    if (recipe.getRecipeTitle().contains(input.getText())) {
+                        foundMatches.add(recipe);
+                    }
                 }
+                adapter.addAll(foundMatches);
+                adapter.notifyDataSetChanged();
             }
         });
 
@@ -122,10 +134,6 @@ public class MainActivity extends AppCompatActivity {
         });
 
         dialog.show();
-    }
-
-    public void deleteRecipeOnClick(View view) {
-
     }
 
 }
