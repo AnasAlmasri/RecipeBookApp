@@ -8,8 +8,10 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
 import android.content.UriMatcher;
-import android.provider.ContactsContract;
 import android.text.TextUtils;
+import android.util.Log;
+
+/* THIS CLASS WAS DERIVED FROM LAB 5 (G53MDP) */
 
 public class MyContentProvider extends ContentProvider {
 
@@ -82,6 +84,7 @@ public class MyContentProvider extends ContentProvider {
 
     @Override
     public boolean onCreate() {
+        Log.d("MYAPP", "MyContentProvider: onCreate()");
         dbHandler = new DatabaseHandler(getContext(), null, null, 1);
         return false;
     }
